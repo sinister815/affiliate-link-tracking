@@ -1,43 +1,50 @@
 services:
-  # ── API Server ─────────────────────────────────────────────────────────────
+  # ── API Server ──────────────────────────────────────────────
   - type: web
     name: bot-api
     runtime: node
-    plan: starter
+    plan: free
     rootDir: backend
     buildCommand: npm ci
     startCommand: node src/index.js
     healthCheckPath: /api/audit
+
     envVars:
       - key: NODE_ENV
         value: production
+
       - key: MONGO_URI
         sync: false
+
       - key: REDIS_URL
         fromService:
           name: bot-redis
-          type: redis
+          type: keyvalue
           property: connectionString
+
       - key: REDIS_HOST
         fromService:
           name: bot-redis
-          type: redis
+          type: keyvalue
           property: host
+
       - key: REDIS_PORT
         fromService:
           name: bot-redis
-          type: redis
+          type: keyvalue
           property: port
-      # GitHub Actions trigger — worker runs on self-hosted runner, not Render
+
       - key: GITHUB_PAT
         sync: false
+
       - key: GITHUB_REPO_OWNER
         sync: false
+
       - key: GITHUB_REPO_NAME
         sync: false
 
-  # ── Managed Redis ──────────────────────────────────────────────────────────
-  - type: redis
+  # ── Managed Redis / Key Value ─────────────────────────────
+  - type: keyvalue
     name: bot-redis
-    plan: starter
+    plan: free
     ipAllowList: []
