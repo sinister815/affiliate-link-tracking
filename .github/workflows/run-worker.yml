@@ -43,7 +43,7 @@ jobs:
         working-directory: backend
         run: npx puppeteer browsers install chrome
         env:
-        PUPPETEER_CACHE_DIR: "${{ runner.temp }}/puppeteer"
+          PUPPETEER_CACHE_DIR: "${{ runner.temp }}/puppeteer"
 
       - name: Process audit queue
         working-directory: backend
@@ -54,4 +54,4 @@ jobs:
           REDIS_HOST: ${{ secrets.REDIS_HOST }}
           REDIS_PORT: ${{ secrets.REDIS_PORT }}
           WORKER_CONCURRENCY: 2
-         PUPPETEER_CACHE_DIR: "${{ runner.temp }}/puppeteer"
+          PUPPETEER_CACHE_DIR: "${{ runner.temp }}/puppeteer"
