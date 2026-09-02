@@ -10,7 +10,7 @@ jobs:
     timeout-minutes: 30
     defaults:
       run:
-        shell: bash          # use Git Bash instead of PowerShell
+        shell: pwsh
 
     steps:
       - name: Checkout repository
@@ -22,15 +22,18 @@ jobs:
           node-version: 20
 
       - name: Install backend dependencies
-        run: cd backend && npm ci
+        working-directory: backend
+        run: npm ci
 
       - name: Install Puppeteer browser
-        run: cd backend && npx puppeteer browsers install chrome
+        working-directory: backend
+        run: npx puppeteer browsers install chrome
         env:
           PUPPETEER_CACHE_DIR: /tmp/.puppeteer
 
       - name: Process audit queue
-        run: cd backend && node src/worker.js
+        working-directory: backend
+        run: node src/worker.js
         env:
           MONGO_URI: ${{ secrets.MONGO_URI }}
           REDIS_URL: ${{ secrets.REDIS_URL }}
