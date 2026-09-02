@@ -1,0 +1,67 @@
+services:
+  # ── API Server ─────────────────────────────────────────────────────────────
+  - type: web
+    name: bot-api
+    runtime: node
+    plan: starter            # free tier works but Puppeteer needs ~512MB+
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: node src/index.js
+    healthCheckPath: /api/audit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false          # set manually in Render dashboard
+      - key: REDIS_URL
+        fromService:
+          name: bot-redis
+          type: redis
+          property: connectionString
+      - key: REDIS_HOST
+        fromService:
+          name: bot-redis
+          type: redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          name: bot-redis
+          type: redis
+          property: port
+
+  # ── Background Worker ──────────────────────────────────────────────────────
+  - type: worker
+    name: bot-worker
+    runtime: node
+    plan: starter
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: node src/worker.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          name: bot-redis
+          type: redis
+          property: connectionString
+      - key: REDIS_HOST
+        fromService:
+          name: bot-redis
+          type: redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          name: bot-redis
+          type: redis
+          property: port
+      - key: WORKER_CONCURRENCY
+        value: "2"
+
+  # ── Managed Redis ──────────────────────────────────────────────────────────
+  - type: redis
+    name: bot-redis
+    plan: starter             # 25MB free, upgrade if needed
+    ipAllowList: []           # only accessible from Render private network

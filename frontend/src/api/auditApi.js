@@ -1,9 +1,11 @@
 import axios from "axios";
 
 // A single axios instance for the audit API. In dev, Vite proxies /api to the
-// backend (see vite.config.js). In production serve /api from the same origin.
+// backend (see vite.config.js). In production set VITE_API_BASE to the backend URL.
 const api = axios.create({
-  baseURL: "/api/audit",
+  baseURL: import.meta.env.VITE_API_BASE
+    ? `${import.meta.env.VITE_API_BASE}/api/audit`
+    : "/api/audit",
   timeout: 120000, // audits may take a while (puppeteer + retries)
 });
 

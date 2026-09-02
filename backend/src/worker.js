@@ -130,6 +130,25 @@ function startWorker() {
   });
 
   console.log(`🚀 Worker started (concurrency: ${CONCURRENCY})`);
+
+  // ── Drain detection ────────────────────────────────────────────────────
+  // When running inside GitHub Actions the worker should process all pending
+  // jobs and then exit cleanly instead of polling forever.
+  const drainCheck = setInterval(async () => {
+    try {
+      const counts = await activeWorker.getJobCounts('waiting', 'active', 'delayed');
+      const total = counts.waiting + counts.active + counts.delayed;
+      if (total === 0) {
+        console.log('📭 Queue drained. Shutting down...');
+        clearInterval(drainCheck);
+        await shutdown('DRAIN');
+      } else {
+        console.log(`⏳ ${total} job(s) remaining (waiting: ${counts.waiting}, active: ${counts.active}, delayed: ${counts.delayed})`);
+      }
+    } catch (err) {
+      console.warn('[drain-check] Error:', err.message);
+    }
+  }, 5000);  // check every 5 seconds
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────

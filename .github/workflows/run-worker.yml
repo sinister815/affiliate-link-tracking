@@ -1,0 +1,49 @@
+name: Run Audit Worker
+
+# ─── Trigger options ──────────────────────────────────────────────────────────
+# Option A: Manual trigger from the Actions tab
+# Option B: Called from another workflow after enqueueing jobs
+# Option C: On a cron schedule (uncomment below)
+# on:
+#   schedule:
+#     - cron: "*/5 * * * *"   # every 5 minutes
+on:
+  workflow_dispatch:        # click "Run workflow" in the Actions UI
+  workflow_call:            # reusable: other workflows can call this one
+
+jobs:
+  process-queue:
+    runs-on: self-hosted      # uses YOUR runner, not GitHub-hosted
+    timeout-minutes: 30       # safety cap — worker should exit long before this
+
+    steps:
+      # ── 1. Checkout code ────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Setup Node.js ───────────────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # ── 3. Install dependencies ────────────────────────────────────────
+      - name: Install backend dependencies
+        run: cd backend && npm ci
+
+      # ── 4. Run Puppeteer system deps (self-hosted runners may need this)
+      - name: Install Puppeteer browser
+        run: cd backend && npx puppeteer browsers install chrome
+        env:
+          PUPPETEER_CACHE_DIR: /tmp/.puppeteer
+
+      # ── 5. Run the worker (exits when queue is drained) ────────────────
+      - name: Process audit queue
+        run: cd backend && node src/worker.js
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT }}
+          WORKER_CONCURRENCY: 2
+          PUPPETEER_CACHE_DIR: /tmp/.puppeteer

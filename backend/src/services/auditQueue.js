@@ -4,8 +4,49 @@ import { Job } from '../models/job.model.js';
 import { AuditResult } from '../models/jobResult.model.js';
 import { runCheckWithRetry } from './runner.service.js';
 import { proxyManager } from './proxy.service.js';
+import dotenv from 'dotenv';
+
+dotenv.config({ path: '.env' });
 
 let queue = null;
+
+// ── GitHub Actions trigger ───────────────────────────────────────────────────
+// After enqueuing jobs, kick off the worker workflow on GitHub Actions.
+// Requires GITHUB_PAT, GITHUB_REPO_OWNER, and GITHUB_REPO_NAME env vars.
+async function triggerWorkerWorkflow() {
+  const token = process.env.GITHUB_PAT;
+  const owner = process.env.GITHUB_REPO_OWNER;
+  const repo = process.env.GITHUB_REPO_NAME;
+  const workflow = process.env.GITHUB_WORKFLOW_FILE || 'run-worker.yml';
+  const ref = process.env.GITHUB_WORKFLOW_REF || 'main';
+
+  if (!token || !owner || !repo) {
+    console.warn('⚠️ GitHub workflow trigger skipped (missing GITHUB_PAT / GITHUB_REPO_OWNER / GITHUB_REPO_NAME)');
+    return;
+  }
+
+  try {
+    const url = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflow}/dispatches`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ ref })
+    });
+
+    if (res.ok) {
+      console.log(`🚀 Triggered GitHub Actions workflow: ${workflow} (ref: ${ref})`);
+    } else {
+      const body = await res.text();
+      console.warn(`⚠️ GitHub workflow trigger failed (${res.status}): ${body}`);
+    }
+  } catch (err) {
+    console.warn('⚠️ GitHub workflow trigger error:', err.message);
+  }
+}
 
 /**
  * Initialize the queue. Returns true if Redis is available, false otherwise.
@@ -73,6 +114,9 @@ export async function enqueueBatch(urls) {
   // Mark as processing once jobs are in the queue
   job.status = 'processing';
   await job.save();
+
+  // Kick off the worker workflow on GitHub Actions (fire-and-forget)
+  triggerWorkerWorkflow();
 
   return { jobId: job._id, totalLinks: urls.length };
 }
