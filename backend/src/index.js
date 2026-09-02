@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import dotenv from "dotenv";
 import { connectDB } from './config/db.js';
 
@@ -8,6 +9,19 @@ dotenv.config({
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Allow requests from the deployed frontend
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:5173',
+].filter(Boolean);
+
+app.use(cors({
+  origin: allowedOrigins.length > 0 ? allowedOrigins : '*',
+  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type'],
+}));
+
 app.use(express.json());
 
 import auditRouter from './routes/job.route.js';
