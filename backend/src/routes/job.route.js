@@ -4,21 +4,24 @@ import {
   listJobs,
   getJobResults,
   getJobSummary,
+  getJobQueueStatus,
   deleteJob
 } from '../controllers/job.controller.js';
 
 const router = Router();
 
-// Audits are processed synchronously; the full result set (plus a jobId) is
-// returned directly in the POST response.
+// Enqueues a batch of URLs for background processing by the worker.
+// Returns immediately with a jobId to poll for status.
 router.post('/', createBatchAudit);
 
 // List all persisted jobs (powers the dashboard table).
 router.get('/', listJobs);
 
 // Retrieve a computed summary of a job (counts + issuesOnly).
-// Placed before /:jobId to avoid route conflict.
 router.get('/summary/:jobId', getJobSummary);
+
+// Retrieve the current processing status of a background job.
+router.get('/status/:jobId', getJobQueueStatus);
 
 // Retrieve a persisted job + its audit results by id.
 router.get('/:jobId', getJobResults);

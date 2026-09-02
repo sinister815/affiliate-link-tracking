@@ -2,6 +2,7 @@ import { runCheckWithRetry } from '../services/runner.service.js';
 import { proxyManager } from '../services/proxy.service.js';
 import { Job } from '../models/job.model.js';
 import { AuditResult } from '../models/jobResult.model.js';
+import { enqueueBatch, getQueueJobStatus } from '../services/auditQueue.js';
 
 const DEFAULT_CONCURRENCY = 3;
 const DEFAULT_MAX_RETRIES = 3;
@@ -79,10 +80,11 @@ async function persistResults(job, results) {
 }
 
 /**
- * Audits a batch of URLs synchronously and returns the full result set
- * directly in the response. Each URL is persisted (Job + AuditResult documents)
- * on a best-effort basis — if MongoDB is unavailable the audit still runs and
- * returns results.
+ * Enqueues a batch of URLs for background processing by the worker.
+ * Returns immediately with a jobId that can be polled for status.
+ *
+ * The worker (src/worker.js) picks up jobs from the BullMQ queue and runs
+ * Puppeteer checks, persisting results to MongoDB as it goes.
  */
 export async function createBatchAudit(req, res) {
   try {
@@ -94,34 +96,30 @@ export async function createBatchAudit(req, res) {
       });
     }
 
-    const concurrency = Number(process.env.AUDIT_CONCURRENCY) || DEFAULT_CONCURRENCY;
-    const maxRetries = Number(process.env.AUDIT_MAX_RETRIES) || DEFAULT_MAX_RETRIES;
-
-    // Create the Job record first (status: processing) so results can be
-    // associated with it. Persistence is best-effort — if Mongo is down, the
-    // audit still runs and returns results.
-    let job = null;
-    try {
-      job = await Job.create({
-        status: 'processing',
-        totalLinks: urls.length
-      });
-    } catch (err) {
-      console.warn('⚠️ Could not create Job record (Mongo unavailable?):', err.message);
-    }
-
-    const results = await runWithConcurrency(urls, concurrency, (url) =>
-      runCheckWithRetry(url, proxyManager, maxRetries)
-    );
-
-    if (job) await persistResults(job, results);
+    const { jobId, totalLinks } = await enqueueBatch(urls);
 
     return res.json({
-      jobId: job ? job._id : null,
-      totalProcessed: results.length,
-      totalLinks: urls.length,
-      results
+      jobId,
+      totalLinks,
+      message: 'Batch enqueued for processing. Poll /api/audit/:jobId/status for progress.'
     });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+/**
+ * Returns the current processing status of a background job.
+ * Useful for polling progress after submitting a batch.
+ */
+export async function getJobQueueStatus(req, res) {
+  try {
+    const { jobId } = req.params;
+    const status = await getQueueJobStatus(jobId);
+    if (!status) {
+      return res.status(404).json({ error: 'Job not found.' });
+    }
+    return res.json(status);
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

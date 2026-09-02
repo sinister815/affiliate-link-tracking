@@ -23,9 +23,10 @@ function useDialog() {
 export const DialogContent = React.forwardRef(
   ({ className, children, ...props }, ref) => {
     const ctx = useDialog();
-    if (!ctx.open) return null;
 
+    // Hook must be called unconditionally (before any early return)
     React.useEffect(() => {
+      if (!ctx.open) return;
       const onKey = (e) => {
         if (e.key === "Escape") ctx.onOpenChange(false);
       };
@@ -37,6 +38,8 @@ export const DialogContent = React.forwardRef(
         document.body.style.overflow = prev;
       };
     }, [ctx]);
+
+    if (!ctx.open) return null;
 
     return createPortal(
       <div

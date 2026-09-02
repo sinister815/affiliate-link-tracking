@@ -27,6 +27,11 @@ export const getJobSummary = async (jobId) => {
   return data;
 };
 
+export const getJobQueueStatus = async (jobId) => {
+  const { data } = await api.get(`/status/${jobId}`);
+  return data;
+};
+
 export const deleteJob = async (jobId) => {
   const { data } = await api.delete(`/jobs/${jobId}`);
   return data;
