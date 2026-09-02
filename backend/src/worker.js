@@ -4,13 +4,10 @@
  * This runs independently from the web server. It pulls jobs from the BullMQ
  * queue (backed by Redis) and runs Puppeteer checks against affiliate links.
  *
- * Deploy this as a separate Render Background Worker (or any process manager).
- * The web API enqueues jobs; this worker consumes them.
- *
  *   npm run worker   (or: node src/worker.js)
  */
 
-import { Worker } from 'bullmq';
+import { Worker, Queue } from 'bullmq';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import { connection } from './config/redis.js';
@@ -64,6 +61,7 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 // ── Worker logic ─────────────────────────────────────────────────────────────
 function startWorker() {
   const workerConnection = connection.duplicate();
+  const auditQueue = new Queue('audit-queue', { connection: connection.duplicate() });
 
   activeWorker = new Worker(
     'audit-queue',
@@ -132,15 +130,14 @@ function startWorker() {
   console.log(`🚀 Worker started (concurrency: ${CONCURRENCY})`);
 
   // ── Drain detection ────────────────────────────────────────────────────
-  // When running inside GitHub Actions the worker should process all pending
-  // jobs and then exit cleanly instead of polling forever.
   const drainCheck = setInterval(async () => {
     try {
-      const counts = await activeWorker.getJobCounts('waiting', 'active', 'delayed');
+      const counts = await auditQueue.getJobCounts('waiting', 'active', 'delayed');
       const total = counts.waiting + counts.active + counts.delayed;
       if (total === 0) {
         console.log('📭 Queue drained. Shutting down...');
         clearInterval(drainCheck);
+        await auditQueue.close();
         await shutdown('DRAIN');
       } else {
         console.log(`⏳ ${total} job(s) remaining (waiting: ${counts.waiting}, active: ${counts.active}, delayed: ${counts.delayed})`);
@@ -148,7 +145,7 @@ function startWorker() {
     } catch (err) {
       console.warn('[drain-check] Error:', err.message);
     }
-  }, 5000);  // check every 5 seconds
+  }, 5000);
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
