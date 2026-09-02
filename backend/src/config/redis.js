@@ -1,23 +1,32 @@
 import IORedis from 'ioredis'
 import dotenv from "dotenv"
+
 dotenv.config({
     path: '.env'
 })
-console.log("redis",process.env.REDIS_URL)
 
+const redisUrl = process.env.REDIS_URL
 
-export const connection = new IORedis(
-    process.env.REDIS_URL,
-    {
-    host: process.env.REDIS_HOST,
-    port: process.env.REDIS_PORT || 6379,
+if (!redisUrl) {
+  console.error('❌ REDIS_URL is not set')
+  process.exit(1)
+}
+
+console.log("redis", redisUrl)
+
+export const connection = new IORedis(redisUrl, {
     maxRetriesPerRequest: null,
-    tls : {}
-});
+    tls: redisUrl.startsWith('rediss://') ? {} : undefined,
+    retryStrategy(times) {
+      const delay = Math.min(times * 200, 5000)
+      return delay
+    }
+})
+
 connection.on('connect', () => {
-    console.log('✅ Redis connected successfully!');
-});
+    console.log('✅ Redis connected successfully!')
+})
 
 connection.on('error', (err) => {
-    console.error('❌ Redis Connection Error:', err.message);
-}); 
+    console.error('❌ Redis Connection Error:', err.message)
+})
