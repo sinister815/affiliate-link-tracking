@@ -110,6 +110,8 @@ service-account*.json
 
 # extras
 
+actions-runner/
+
 .kilo
 .vscode
 .freebuff
