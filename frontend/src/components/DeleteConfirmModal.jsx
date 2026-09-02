@@ -24,7 +24,7 @@ export default function DeleteConfirmModal({ open, onClose, jobId, onDeleted }) 
       onDeleted();
       onClose();
     } catch (e) {
-      setError(e.message || "Failed to delete batch");
+      setError("Failed to delete batch");
     } finally {
       setDeleting(false);
     }

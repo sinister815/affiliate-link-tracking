@@ -1,7 +1,8 @@
-import express from 'express';
+import express from 'express'
 import cors from 'cors';
 import dotenv from "dotenv";
 import { connectDB } from './config/db.js';
+import { initSSEBroadcaster, addSSEClient, removeSSEClient } from './services/events.js';
 
 dotenv.config({
     path: '.env'
@@ -24,6 +25,25 @@ app.use(cors({
 
 app.use(express.json());
 
+// ── SSE: real-time job completion events ─────────────────────────────────────
+app.get('/api/audit/events', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  addSSEClient(res);
+
+  // Send a keepalive comment every 30 s so proxies/browsers don't close
+  const keepalive = setInterval(() => res.write(': keepalive\n\n'), 30000);
+
+  req.on('close', () => {
+    clearInterval(keepalive);
+    removeSSEClient(res);
+  });
+});
+
 import auditRouter from './routes/job.route.js';
 app.use('/api/audit', auditRouter);
 
@@ -39,5 +59,8 @@ const dbReady = await connectDB().catch((err) => {
 });
 
 console.log(dbReady)
+
+// Start SSE broadcaster (subscribes to Redis job-events channel)
+initSSEBroadcaster();
 
 app.listen(PORT, () => console.log(`Server live on port ${PORT}`));

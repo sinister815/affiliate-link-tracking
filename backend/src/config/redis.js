@@ -12,7 +12,7 @@ if (!redisUrl) {
   process.exit(1)
 }
 
-console.log("redis", redisUrl)
+// console.log("redis", redisUrl)
 
 export const connection = new IORedis(redisUrl, {
     maxRetriesPerRequest: null,

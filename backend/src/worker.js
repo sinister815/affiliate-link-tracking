@@ -15,6 +15,7 @@ import { AuditResult } from './models/jobResult.model.js';
 import { Job } from './models/job.model.js';
 import { proxyManager } from './services/proxy.service.js';
 import { runCheckWithRetry } from './services/runner.service.js';
+import { publishJobEvent } from './services/events.js';
 
 dotenv.config({ path: '.env' });
 
@@ -116,6 +117,7 @@ function startWorker() {
       if (processed >= jobDoc.totalLinks && jobDoc.status === 'processing') {
         jobDoc.status = 'completed';
         await jobDoc.save();
+        publishJobEvent({ type: 'job-completed', jobId, status: jobDoc.status, completedLinks: jobDoc.completedLinks, failedLinks: jobDoc.failedLinks, totalLinks: jobDoc.totalLinks });
         console.log(`[worker] Job ${jobId} completed (${processed}/${jobDoc.totalLinks})`);
       }
     } catch (err) {
