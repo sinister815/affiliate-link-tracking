@@ -173,7 +173,8 @@ export default function Dashboard() {
   };
 
   const handleDeleted = () => {
-    fetchJobs();
+    // Remove the row locally — no full refetch, no loading flash
+    setJobs((prev) => prev.filter((j) => j._id !== selectedJobId));
   };
 
   const handleGetFullInfo = (jobId) => {
