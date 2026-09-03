@@ -45,6 +45,33 @@ jobs:
         env:
           PUPPETEER_CACHE_DIR: "${{ runner.temp }}/puppeteer"
 
+      - name: Verify Redis connectivity
+        working-directory: backend
+        run: |
+          node -e "
+            const IORedis = require('ioredis');
+            const redis = new IORedis(process.env.REDIS_URL, {
+              connectTimeout: 10000,
+              enableReadyCheck: true,
+              tls: (process.env.REDIS_URL || '').startsWith('rediss://') ? {} : undefined,
+              maxRetriesPerRequest: 1,
+              retryStrategy(times) { return Math.min(times * 200, 3000); }
+            });
+            redis.on('ready', async () => {
+              console.log('✅ Redis is reachable');
+              const pong = await redis.ping();
+              console.log('PING →', pong);
+              await redis.quit();
+              process.exit(0);
+            });
+            redis.on('error', (err) => {
+              console.error('❌ Redis check failed:', err.message);
+              process.exit(1);
+            });
+          "
+        env:
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+
       - name: Process audit queue
         working-directory: backend
         run: node src/worker.js

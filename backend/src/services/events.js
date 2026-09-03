@@ -6,6 +6,19 @@ const CHANNEL = 'job-events';
 const sseClients = new Set();
 
 let subscriber = null;
+let publisher = null;
+
+/**
+ * Lazily create a dedicated connection for publishing.
+ * Keeps publish commands off the BullMQ-managed connection so there's
+ * no risk of command pipelining conflicts.
+ */
+function getPublisher() {
+  if (!publisher) {
+    publisher = connection.duplicate();
+  }
+  return publisher;
+}
 
 /**
  * Publish a job event to the Redis channel so the Express SSE broadcaster
@@ -13,7 +26,7 @@ let subscriber = null;
  */
 export function publishJobEvent(event) {
   try {
-    connection.publish(CHANNEL, JSON.stringify(event));
+    getPublisher().publish(CHANNEL, JSON.stringify(event));
   } catch (err) {
     console.warn('[events] Failed to publish job event:', err.message);
   }
